@@ -49,21 +49,27 @@ defmodule Bookmarks.AccountsTest do
   end
 
   describe "register_user/1" do
-    test "requires email and password to be set" do
+    test "requires name, email and password to be set" do
       {:error, changeset} = Accounts.register_user(%{})
 
       assert %{
                password: ["can't be blank"],
-               email: ["can't be blank"]
+               email: ["can't be blank"],
+               name: ["can't be blank"]
              } = errors_on(changeset)
     end
 
     test "validates email and password when given" do
-      {:error, changeset} = Accounts.register_user(%{email: "not valid", password: "not valid"})
+      {:error, changeset} =
+        Accounts.register_user(%{name: "aa", email: "not valid", password: "not valid"})
 
       assert %{
+               name: ["should be at least 3 character(s)"],
                email: ["must have the @ sign and no spaces"],
-               password: ["should be at least 12 character(s)"]
+               password: [
+                 "at least one digit or punctuation character",
+                 "at least one upper case character"
+               ]
              } = errors_on(changeset)
     end
 
@@ -88,6 +94,7 @@ defmodule Bookmarks.AccountsTest do
       email = unique_user_email()
       {:ok, user} = Accounts.register_user(valid_user_attributes(email: email))
       assert user.email == email
+      assert is_binary(user.name)
       assert is_binary(user.hashed_password)
       assert is_nil(user.confirmed_at)
       assert is_nil(user.password)
@@ -97,23 +104,65 @@ defmodule Bookmarks.AccountsTest do
   describe "change_user_registration/2" do
     test "returns a changeset" do
       assert %Ecto.Changeset{} = changeset = Accounts.change_user_registration(%User{})
-      assert changeset.required == [:password, :email]
+      assert changeset.required == [:password, :email, :name]
     end
 
     test "allows fields to be set" do
       email = unique_user_email()
       password = valid_user_password()
+      name = valid_user_name()
 
       changeset =
         Accounts.change_user_registration(
           %User{},
-          valid_user_attributes(email: email, password: password)
+          valid_user_attributes(email: email, password: password, name: name)
         )
 
       assert changeset.valid?
+      assert get_change(changeset, :name) == name
       assert get_change(changeset, :email) == email
       assert get_change(changeset, :password) == password
       assert is_nil(get_change(changeset, :hashed_password))
+    end
+  end
+
+  describe "change_user_name/2" do
+    test "returns a user changeset" do
+      assert %Ecto.Changeset{} = changeset = Accounts.change_user_name(%User{})
+      assert changeset.required == [:name]
+    end
+  end
+
+  describe "update_user_name/2" do
+    setup do
+      %{user: user_fixture()}
+    end
+
+    test "validates name", %{user: user} do
+      {:error, changeset} =
+        Accounts.update_user_name(user, %{name: "aa"})
+
+      assert %{
+               name: ["should be at least 3 character(s)"]
+             } = errors_on(changeset)
+    end
+
+    test "validates maximum values for name for security", %{user: user} do
+      too_long = String.duplicate("db", 200)
+
+      {:error, changeset} =
+        Accounts.update_user_name(user, %{name: too_long})
+
+      assert "should be at most 100 character(s)" in errors_on(changeset).name
+    end
+
+    test "updates the name", %{user: user} do
+      {:ok, user} =
+        Accounts.update_user_name(user, %{
+          name: valid_user_name()
+        })
+
+      assert user.name === valid_user_name()
     end
   end
 
@@ -245,11 +294,11 @@ defmodule Bookmarks.AccountsTest do
     test "allows fields to be set" do
       changeset =
         Accounts.change_user_password(%User{}, %{
-          "password" => "new valid password"
+          "password" => "N3w valid password!"
         })
 
       assert changeset.valid?
-      assert get_change(changeset, :password) == "new valid password"
+      assert get_change(changeset, :password) == "N3w valid password!"
       assert is_nil(get_change(changeset, :hashed_password))
     end
   end
@@ -267,7 +316,10 @@ defmodule Bookmarks.AccountsTest do
         })
 
       assert %{
-               password: ["should be at least 12 character(s)"],
+               password: [
+                 "at least one digit or punctuation character",
+                 "at least one upper case character"
+               ],
                password_confirmation: ["does not match password"]
              } = errors_on(changeset)
     end
@@ -291,11 +343,11 @@ defmodule Bookmarks.AccountsTest do
     test "updates the password", %{user: user} do
       {:ok, user} =
         Accounts.update_user_password(user, valid_user_password(), %{
-          password: "new valid password"
+          password: "N3w valid password!"
         })
 
       assert is_nil(user.password)
-      assert Accounts.get_user_by_email_and_password(user.email, "new valid password")
+      assert Accounts.get_user_by_email_and_password(user.email, "N3w valid password!")
     end
 
     test "deletes all tokens for the given user", %{user: user} do
@@ -303,7 +355,7 @@ defmodule Bookmarks.AccountsTest do
 
       {:ok, _} =
         Accounts.update_user_password(user, valid_user_password(), %{
-          password: "new valid password"
+          password: "N3w valid password!"
         })
 
       refute Repo.get_by(UserToken, user_id: user.id)
@@ -476,7 +528,10 @@ defmodule Bookmarks.AccountsTest do
         })
 
       assert %{
-               password: ["should be at least 12 character(s)"],
+               password: [
+                 "at least one digit or punctuation character",
+                 "at least one upper case character"
+               ],
                password_confirmation: ["does not match password"]
              } = errors_on(changeset)
     end
@@ -488,14 +543,14 @@ defmodule Bookmarks.AccountsTest do
     end
 
     test "updates the password", %{user: user} do
-      {:ok, updated_user} = Accounts.reset_user_password(user, %{password: "new valid password"})
+      {:ok, updated_user} = Accounts.reset_user_password(user, %{password: "N3w valid password!"})
       assert is_nil(updated_user.password)
-      assert Accounts.get_user_by_email_and_password(user.email, "new valid password")
+      assert Accounts.get_user_by_email_and_password(user.email, "N3w valid password!")
     end
 
     test "deletes all tokens for the given user", %{user: user} do
       _ = Accounts.generate_user_session_token(user)
-      {:ok, _} = Accounts.reset_user_password(user, %{password: "new valid password"})
+      {:ok, _} = Accounts.reset_user_password(user, %{password: "N3w valid password!"})
       refute Repo.get_by(UserToken, user_id: user.id)
     end
   end

@@ -38,9 +38,15 @@ defmodule Bookmarks.Accounts.User do
   def registration_changeset(user, attrs, opts \\ []) do
     user
     |> cast(attrs, [:name, :email, :password])
-    |> validate_required(:name)
+    |> validate_name(:name)
     |> validate_email(opts)
     |> validate_password(opts)
+  end
+
+  defp validate_name(changeset, _opts) do
+    changeset
+    |> validate_required([:name])
+    |> validate_length(:name, min: 3, max: 100)
   end
 
   defp validate_email(changeset, opts) do
@@ -131,7 +137,7 @@ defmodule Bookmarks.Accounts.User do
   def name_changeset(user, attrs) do
     user
     |> cast(attrs, [:name])
-    |> validate_required(:name)
+    |> validate_name(:name)
   end
 
   @doc """

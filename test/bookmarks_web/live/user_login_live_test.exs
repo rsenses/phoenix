@@ -26,13 +26,15 @@ defmodule BookmarksWeb.UserLoginLiveTest do
 
   describe "user login" do
     test "redirects if user login with valid credentials", %{conn: conn} do
-      password = "123456789abcd"
+      password = "123456789Abcd."
       user = user_fixture(%{password: password})
 
       {:ok, lv, _html} = live(conn, ~p"/users/log_in")
 
       form =
-        form(lv, "#login_form", user: %{email: user.email, password: password, remember_me: true})
+        form(lv, "#login_form",
+          user: %{name: user.name, email: user.email, password: password, remember_me: true}
+        )
 
       conn = submit_form(form, conn)
 
